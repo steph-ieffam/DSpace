@@ -4,6 +4,10 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
            http://www.springframework.org/schema/beans/spring-beans-2.5.xsd">
 
+    <bean id="org.dspace.identifier.VersionedHandleIdentifierProvider" class="edu.harvard.huit.lts.dash.nrs.HarvardNrsIdentifierProvider" scope="singleton">
+        <property name="configurationService" ref="org.dspace.services.ConfigurationService"/>
+    </bean>
+
     <!-- Identifier Service Application Interface.  Will be autowired with
          any Identifier Providers present in Spring context.
     -->
