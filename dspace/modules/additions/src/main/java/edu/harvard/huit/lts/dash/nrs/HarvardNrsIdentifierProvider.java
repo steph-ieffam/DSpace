@@ -7,7 +7,7 @@ import java.sql.SQLException;
 
 import org.dspace.content.DSpaceObject;
 import org.dspace.content.Item;
-import org.dspace.content.service.ItemService;
+import org.dspace.content.factory.ContentServiceFactory;
 import org.dspace.core.Context;
 import org.dspace.handle.service.HandleService;
 import org.dspace.identifier.Identifier;
@@ -22,9 +22,6 @@ public class HarvardNrsIdentifierProvider extends VersionedHandleIdentifierProvi
     private static Logger log = LoggerFactory.getLogger(HarvardNrsIdentifierProvider.class);
 
     private String apath, nid;
-
-    @Autowired
-    private ItemService itemService;
 
     @Autowired(required = true)
     private HandleService handleService;
@@ -50,27 +47,26 @@ public class HarvardNrsIdentifierProvider extends VersionedHandleIdentifierProvi
     }
 
     @Override
-    public String register(Context context, DSpaceObject item) {
+    public String register(Context context, DSpaceObject dso) {
 
         if (!hasValidConfiguration()) {
-            return super.register(context, item);
+            return super.register(context, dso);
         }
 
-        String result = super.register(context, item);
+        String result = super.register(context, dso);
         log.debug("Identifier {}", result);
-        if (item instanceof Item) {
-            try {
-                itemService.addMetadata(
-                        context,
-                        (Item) item,
-                        "dc",
-                        "identifier",
-                        "uri",
-                        Item.ANY,
-                        getNrsCanonicalForm(result));
-            } catch (SQLException e) {
-                e.printStackTrace();
-            }
+        try {
+            ContentServiceFactory.getInstance().getDSpaceObjectService(dso)
+                    .setMetadataSingleValue(
+                            context,
+                            dso,
+                            "dc",
+                            "identifier",
+                            "uri",
+                            Item.ANY,
+                            getNrsCanonicalForm(result));
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
 
         return result;
