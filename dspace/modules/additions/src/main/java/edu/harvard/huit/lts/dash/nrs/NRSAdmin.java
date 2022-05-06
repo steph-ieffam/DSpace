@@ -6,7 +6,6 @@ import java.security.Key;
 import java.util.Base64;
 import java.util.Date;
 import java.util.Map;
-
 import javax.crypto.spec.SecretKeySpec;
 
 import io.jsonwebtoken.JwsHeader;
@@ -15,10 +14,10 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
-import org.apache.http.entity.StringEntity;
 import org.apache.http.util.EntityUtils;
 import org.dspace.services.ConfigurationService;
 import org.dspace.services.factory.DSpaceServicesFactory;

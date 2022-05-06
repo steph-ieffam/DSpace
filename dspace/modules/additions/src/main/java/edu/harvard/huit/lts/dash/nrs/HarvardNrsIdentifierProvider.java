@@ -21,7 +21,9 @@ public class HarvardNrsIdentifierProvider extends VersionedHandleIdentifierProvi
 
     private static Logger log = LoggerFactory.getLogger(HarvardNrsIdentifierProvider.class);
 
-    private String apath, nid;
+    private String apath;
+
+    private String nid;
 
     @Autowired(required = true)
     private HandleService handleService;
