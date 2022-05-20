@@ -30,6 +30,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.InputStream;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -37,10 +39,12 @@ import javax.ws.rs.core.MediaType;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.dspace.app.rest.matcher.CrisLayoutTabMatcher;
+import org.dspace.app.rest.model.CrisLayoutMetadataConfigurationRest.Bitstream;
 import org.dspace.app.rest.model.CrisLayoutTabRest;
 import org.dspace.app.rest.model.patch.Operation;
 import org.dspace.app.rest.model.patch.ReplaceOperation;
 import org.dspace.app.rest.test.AbstractControllerIntegrationTest;
+import org.dspace.authorize.AuthorizeException;
 import org.dspace.builder.CollectionBuilder;
 import org.dspace.builder.CommunityBuilder;
 import org.dspace.builder.CrisLayoutBoxBuilder;
@@ -50,17 +54,27 @@ import org.dspace.builder.CrisLayoutTabBuilder;
 import org.dspace.builder.CrisMetricsBuilder;
 import org.dspace.builder.EntityTypeBuilder;
 import org.dspace.builder.ItemBuilder;
+import org.dspace.content.Bundle;
 import org.dspace.content.Collection;
 import org.dspace.content.Community;
 import org.dspace.content.EntityType;
 import org.dspace.content.Item;
 import org.dspace.content.MetadataField;
 import org.dspace.content.MetadataSchema;
+import org.dspace.content.MetadataValue;
+import org.dspace.content.WorkspaceItem;
+import org.dspace.content.service.BitstreamService;
+import org.dspace.content.service.BundleService;
+import org.dspace.content.service.CollectionService;
+import org.dspace.content.service.ItemService;
 import org.dspace.content.service.MetadataFieldService;
 import org.dspace.content.service.MetadataSchemaService;
+import org.dspace.content.service.MetadataValueService;
+import org.dspace.content.service.WorkspaceItemService;
 import org.dspace.layout.CrisLayoutBox;
 import org.dspace.layout.CrisLayoutBoxTypes;
 import org.dspace.layout.CrisLayoutCell;
+import org.dspace.layout.CrisLayoutField;
 import org.dspace.layout.CrisLayoutRow;
 import org.dspace.layout.CrisLayoutTab;
 import org.dspace.layout.LayoutSecurity;
@@ -88,6 +102,27 @@ public class CrisLayoutTabRestRepositoryIT extends AbstractControllerIntegration
 
     @Autowired
     private CrisLayoutTabService crisLayoutTabService;
+
+    @Autowired
+    private MetadataFieldService metadataFieldService;
+
+    @Autowired
+    private ItemService itemService;
+
+    @Autowired
+    private WorkspaceItemService workspaceItemService;
+
+    @Autowired
+    private CollectionService collectionService;
+
+    @Autowired
+    private BitstreamService bitstreamService;
+
+    @Autowired
+    private BundleService bundleService;
+    
+    @Autowired
+    private MetadataValueService metadataValueService;
 
     private final String METADATASECURITY_URL = "http://localhost:8080/api/core/metadatafield/";
 
@@ -1602,6 +1637,70 @@ public class CrisLayoutTabRestRepositoryIT extends AbstractControllerIntegration
             .andExpect(jsonPath("$.rows[0].cells[0].boxes", hasSize(1)))
             .andExpect(jsonPath("$.rows[0].cells[0].boxes[0].configuration.discovery-configuration",
                 is("RELATION.Publication.authors")));
+    }
+
+    @Test
+    public void findThumbnailUsingLayoutTabBoxConfiguration() throws Exception {
+        context.turnOffAuthorisationSystem();
+        EntityType eType = EntityTypeBuilder.createEntityTypeBuilder(context, "Publication").build();
+
+        // Setting up configuration for dc.type = logo with rendering thumbnail
+        MetadataField metadataField = metadataFieldService.findByElement(context, "dc", "type", null);
+
+        CrisLayoutBox box = CrisLayoutBoxBuilder.createBuilder(context, eType,
+            CrisLayoutBoxTypes.RELATION.name(), true, true)
+            .withShortname("description-test")
+            .build();
+        CrisLayoutField field = CrisLayoutFieldBuilder.createBistreamField(context, metadataField, "ORIGINAL", 0, 0, 0)
+            .withRendering("thumbnail")
+            .withBox(box)
+            .build();
+        field.setMetadataValue("logo");
+        CrisLayoutTab tab = CrisLayoutTabBuilder.createTab(context, eType, 0)
+            .withShortName("TabOne")
+            .withSecurity(LayoutSecurity.PUBLIC)
+            .withHeader("New Tab header")
+            .addBoxIntoNewRow(box)
+            .build();
+
+        // Creating item and bitstreams
+        Collection submitCollection = collectionService.findAll(context).stream().findFirst().orElse(null);
+
+        WorkspaceItem workspaceItem = workspaceItemService.create(context, submitCollection, true);
+
+        Bundle original = workspaceItem.getItem().getBundles("ORIGINAL").stream().findFirst().orElseGet(() -> {
+            try {
+                return bundleService.create(context, workspaceItem.getItem(), "ORIGINAL");
+            } catch (Exception e) {
+                return null;
+            }
+        });
+
+        org.dspace.content.Bitstream bitstream0 = bitstreamService.create(context, original,
+            InputStream.nullInputStream());
+        org.dspace.content.Bitstream bitstream1 = bitstreamService.create(context, original,
+            InputStream.nullInputStream());
+        org.dspace.content.Bitstream bitstream2 = bitstreamService.create(context, original,
+            InputStream.nullInputStream());
+
+        original.setPrimaryBitstreamID(bitstream0);
+
+        MetadataValue metadataValue = metadataValueService.create(context, bitstream0, metadataField);
+        MetadataValue metadataValue1 = metadataValueService.create(context, bitstream1, metadataField);
+        MetadataValue metadataValue2 = metadataValueService.create(context, bitstream2, metadataField);
+
+        metadataValue2.setValue("logo");
+        
+        //save workspace item
+        
+        // Missing getClient
+        
+        bitstream0.setDeleted(true);
+        bitstream1.setDeleted(true);
+        bitstream2.setDeleted(true);
+//        itemService.delete(context, item);
+
+        context.restoreAuthSystemState();
     }
 
     private CrisLayoutTabRest parseJson(String name) throws Exception {
